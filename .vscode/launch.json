@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "type": "lldb",
+            "type": "lldb-dap",
             "request": "launch",
             "name": "Launch",
             "program": "${workspaceFolder}/test/test_clang++",

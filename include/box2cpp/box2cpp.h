@@ -201,6 +201,7 @@ namespace b2
 
       protected:
         b2ChainId id{};
+        void ExchangeId(Chain& other) { this->id = std::exchange(other.id, {}); };
 
       public:
         static constexpr bool IsOwning = true;
@@ -466,6 +467,7 @@ namespace b2
 
       protected:
         b2ShapeId id{};
+        void ExchangeId(Shape& other) { this->id = std::exchange(other.id, {}); };
 
       public:
         static constexpr bool IsOwning = true;
@@ -626,6 +628,7 @@ namespace b2
 
       protected:
         b2JointId id{};
+        void ExchangeId(Joint& other) { this->id = std::exchange(other.id, {}); };
 
       public:
         static constexpr bool IsOwning = true;
@@ -664,6 +667,237 @@ namespace b2
 
         // Convert a non-const reference to a const reference.
         constexpr MaybeConstJointRef(const MaybeConstJointRef<!IsConstRef>& other) noexcept requires IsConstRef : MaybeConstJointRef(other.Handle()) {}
+    };
+
+    template <typename D, bool ForceConst>
+    class BasicWeldJointInterface
+    {
+      protected:
+        BasicWeldJointInterface() = default;
+
+      public:
+        /// Set weld joint angular damping ratio, non-dimensional
+        void SetAngularDampingRatio(float dampingRatio) /*non-const*/ requires (!ForceConst);
+
+        /// Get the weld joint angular damping ratio, non-dimensional
+        [[nodiscard]] float GetAngularDampingRatio() const;
+
+        /// Set the weld joint angular stiffness in Hertz. 0 is rigid.
+        void SetAngularHertz(float hertz) /*non-const*/ requires (!ForceConst);
+
+        /// Get the weld joint angular stiffness in Hertz
+        [[nodiscard]] float GetAngularHertz() const;
+
+        /// Set the weld joint linear damping ratio (non-dimensional)
+        void SetLinearDampingRatio(float dampingRatio) /*non-const*/ requires (!ForceConst);
+
+        /// Get the weld joint linear damping ratio (non-dimensional)
+        [[nodiscard]] float GetLinearDampingRatio() const;
+
+        /// Set the weld joint linear stiffness in Hertz. 0 is rigid.
+        void SetLinearHertz(float hertz) /*non-const*/ requires (!ForceConst);
+
+        /// Get the weld joint linear stiffness in Hertz
+        [[nodiscard]] float GetLinearHertz() const;
+    };
+
+    /// Weld joint definition
+    /// Connects two bodies together rigidly. This constraint provides springs to mimic
+    /// soft-body simulation.
+    /// @note The approximate solver in Box2D cannot hold many bodies together rigidly
+    /// @ingroup weld_joint
+    class WeldJoint : public Joint, public BasicWeldJointInterface<WeldJoint, false>
+    {
+        template <typename, bool>
+        friend class BasicWeldJointInterface;
+        template <typename, bool>
+        friend class BasicWorldInterface;
+
+      public:
+        static constexpr bool IsOwning = true;
+
+        // Constructs a null (invalid) object.
+        constexpr WeldJoint() noexcept {}
+
+        // The constructor accepts either this or directly `b2WeldJointDef`.
+        struct Params : b2WeldJointDef
+        {
+            Params() : b2WeldJointDef(b2DefaultWeldJointDef()) {}
+        };
+
+        // Downcast from a generic joint.
+        // Triggers an assertion if this isn't the right joint kind.
+        explicit WeldJoint(Joint&& other) noexcept
+        {
+            if (!other || other.GetType() == b2_weldJoint)
+                ExchangeId(other);
+            else
+                BOX2CPP_ASSERT(false && "This joint is not a `WeldJoint`.");
+        }
+    };
+
+    template <bool IsConstRef>
+    class MaybeConstWeldJointRef : public MaybeConstJointRef<IsConstRef>, public BasicWeldJointInterface<WeldJointRef, IsConstRef>
+    {
+        template <typename, bool>
+        friend class BasicWeldJointInterface;
+
+      public:
+        static constexpr bool IsOwning = false;
+        static constexpr bool IsConst = IsConstRef;
+
+        // Constructs a null (invalid) object.
+        constexpr MaybeConstWeldJointRef() noexcept {}
+
+        // Point to an existing handle.
+        // Using a `same_as` template to prevent implicit madness. In particular, to prevent const-to-non-const conversions between non-owning wrappers.
+        // Downcast from a generic joint reference (or owning joint).
+        // Triggers an assertion if this isn't the right joint kind.
+        explicit constexpr MaybeConstWeldJointRef(std::same_as<b2JointId> auto id) noexcept
+        {
+            if (B2_IS_NULL(id) || b2Joint_GetType(id) == b2_weldJoint)
+                this->id = id;
+            else
+                BOX2CPP_ASSERT(false && "This joint is not a `WeldJoint`.");
+        }
+
+        // Create from a non-reference.
+        constexpr MaybeConstWeldJointRef(const WeldJoint& other) noexcept : MaybeConstWeldJointRef(other.Handle()) {}
+
+        // Triggers an assertion if this isn't the right joint kind.
+        explicit constexpr MaybeConstWeldJointRef(MaybeConstJointRef<IsConstRef> other) noexcept : MaybeConstWeldJointRef(other.Handle()) {}
+        // Convert a non-const reference to a const reference.
+        constexpr MaybeConstWeldJointRef(const MaybeConstWeldJointRef<!IsConstRef>& other) noexcept requires IsConstRef : MaybeConstWeldJointRef(other.Handle()) {}
+    };
+
+    template <typename D, bool ForceConst>
+    class BasicWheelJointInterface
+    {
+      protected:
+        BasicWheelJointInterface() = default;
+
+      public:
+        /// Enable/disable the wheel joint limit
+        void EnableLimit(bool enableLimit) /*non-const*/ requires (!ForceConst);
+
+        /// Is the wheel joint limit enabled?
+        [[nodiscard]] bool IsLimitEnabled() const;
+
+        /// Set the wheel joint limits
+        void SetLimits(float lower, float upper) /*non-const*/ requires (!ForceConst);
+
+        /// Get the wheel joint lower limit
+        [[nodiscard]] float GetLowerLimit() const;
+
+        /// Set the wheel joint maximum motor torque, usually in newton-meters
+        void SetMaxMotorTorque(float torque) /*non-const*/ requires (!ForceConst);
+
+        /// Get the wheel joint maximum motor torque, usually in newton-meters
+        [[nodiscard]] float GetMaxMotorTorque() const;
+
+        /// Enable/disable the wheel joint motor
+        void EnableMotor(bool enableMotor) /*non-const*/ requires (!ForceConst);
+
+        /// Is the wheel joint motor enabled?
+        [[nodiscard]] bool IsMotorEnabled() const;
+
+        /// Set the wheel joint motor speed in radians per second
+        void SetMotorSpeed(float motorSpeed) /*non-const*/ requires (!ForceConst);
+
+        /// Get the wheel joint motor speed in radians per second
+        [[nodiscard]] float GetMotorSpeed() const;
+
+        /// Get the wheel joint current motor torque, usually in newton-meters
+        [[nodiscard]] float GetMotorTorque() const;
+
+        /// Enable/disable the wheel joint spring
+        void EnableSpring(bool enableSpring) /*non-const*/ requires (!ForceConst);
+
+        /// Is the wheel joint spring enabled?
+        [[nodiscard]] bool IsSpringEnabled() const;
+
+        /// Set the wheel joint damping ratio, non-dimensional
+        void SetSpringDampingRatio(float dampingRatio) /*non-const*/ requires (!ForceConst);
+
+        /// Get the wheel joint damping ratio, non-dimensional
+        [[nodiscard]] float GetSpringDampingRatio() const;
+
+        /// Set the wheel joint stiffness in Hertz
+        void SetSpringHertz(float hertz) /*non-const*/ requires (!ForceConst);
+
+        /// Get the wheel joint stiffness in Hertz
+        [[nodiscard]] float GetSpringHertz() const;
+
+        /// Get the wheel joint upper limit
+        [[nodiscard]] float GetUpperLimit() const;
+    };
+
+    /// Wheel joint definition
+    /// Body B is a wheel that may rotate freely and slide along the local x-axis in frame A.
+    /// The joint translation is zero when the local frame origins coincide in world space.
+    /// @ingroup wheel_joint
+    class WheelJoint : public Joint, public BasicWheelJointInterface<WheelJoint, false>
+    {
+        template <typename, bool>
+        friend class BasicWheelJointInterface;
+        template <typename, bool>
+        friend class BasicWorldInterface;
+
+      public:
+        static constexpr bool IsOwning = true;
+
+        // Constructs a null (invalid) object.
+        constexpr WheelJoint() noexcept {}
+
+        // The constructor accepts either this or directly `b2WheelJointDef`.
+        struct Params : b2WheelJointDef
+        {
+            Params() : b2WheelJointDef(b2DefaultWheelJointDef()) {}
+        };
+
+        // Downcast from a generic joint.
+        // Triggers an assertion if this isn't the right joint kind.
+        explicit WheelJoint(Joint&& other) noexcept
+        {
+            if (!other || other.GetType() == b2_wheelJoint)
+                ExchangeId(other);
+            else
+                BOX2CPP_ASSERT(false && "This joint is not a `WheelJoint`.");
+        }
+    };
+
+    template <bool IsConstRef>
+    class MaybeConstWheelJointRef : public MaybeConstJointRef<IsConstRef>, public BasicWheelJointInterface<WheelJointRef, IsConstRef>
+    {
+        template <typename, bool>
+        friend class BasicWheelJointInterface;
+
+      public:
+        static constexpr bool IsOwning = false;
+        static constexpr bool IsConst = IsConstRef;
+
+        // Constructs a null (invalid) object.
+        constexpr MaybeConstWheelJointRef() noexcept {}
+
+        // Point to an existing handle.
+        // Using a `same_as` template to prevent implicit madness. In particular, to prevent const-to-non-const conversions between non-owning wrappers.
+        // Downcast from a generic joint reference (or owning joint).
+        // Triggers an assertion if this isn't the right joint kind.
+        explicit constexpr MaybeConstWheelJointRef(std::same_as<b2JointId> auto id) noexcept
+        {
+            if (B2_IS_NULL(id) || b2Joint_GetType(id) == b2_wheelJoint)
+                this->id = id;
+            else
+                BOX2CPP_ASSERT(false && "This joint is not a `WheelJoint`.");
+        }
+
+        // Create from a non-reference.
+        constexpr MaybeConstWheelJointRef(const WheelJoint& other) noexcept : MaybeConstWheelJointRef(other.Handle()) {}
+
+        // Triggers an assertion if this isn't the right joint kind.
+        explicit constexpr MaybeConstWheelJointRef(MaybeConstJointRef<IsConstRef> other) noexcept : MaybeConstWheelJointRef(other.Handle()) {}
+        // Convert a non-const reference to a const reference.
+        constexpr MaybeConstWheelJointRef(const MaybeConstWheelJointRef<!IsConstRef>& other) noexcept requires IsConstRef : MaybeConstWheelJointRef(other.Handle()) {}
     };
 
     template <typename D, bool ForceConst>
@@ -774,7 +1008,7 @@ namespace b2
         explicit DistanceJoint(Joint&& other) noexcept
         {
             if (!other || other.GetType() == b2_distanceJoint)
-                this->id = std::exchange(other.id, {});
+                ExchangeId(other);
             else
                 BOX2CPP_ASSERT(false && "This joint is not a `DistanceJoint`.");
         }
@@ -909,7 +1143,7 @@ namespace b2
         explicit MotorJoint(Joint&& other) noexcept
         {
             if (!other || other.GetType() == b2_motorJoint)
-                this->id = std::exchange(other.id, {});
+                ExchangeId(other);
             else
                 BOX2CPP_ASSERT(false && "This joint is not a `MotorJoint`.");
         }
@@ -1053,7 +1287,7 @@ namespace b2
         explicit PrismaticJoint(Joint&& other) noexcept
         {
             if (!other || other.GetType() == b2_prismaticJoint)
-                this->id = std::exchange(other.id, {});
+                ExchangeId(other);
             else
                 BOX2CPP_ASSERT(false && "This joint is not a `PrismaticJoint`.");
         }
@@ -1193,7 +1427,7 @@ namespace b2
         explicit RevoluteJoint(Joint&& other) noexcept
         {
             if (!other || other.GetType() == b2_revoluteJoint)
-                this->id = std::exchange(other.id, {});
+                ExchangeId(other);
             else
                 BOX2CPP_ASSERT(false && "This joint is not a `RevoluteJoint`.");
         }
@@ -1231,237 +1465,6 @@ namespace b2
         explicit constexpr MaybeConstRevoluteJointRef(MaybeConstJointRef<IsConstRef> other) noexcept : MaybeConstRevoluteJointRef(other.Handle()) {}
         // Convert a non-const reference to a const reference.
         constexpr MaybeConstRevoluteJointRef(const MaybeConstRevoluteJointRef<!IsConstRef>& other) noexcept requires IsConstRef : MaybeConstRevoluteJointRef(other.Handle()) {}
-    };
-
-    template <typename D, bool ForceConst>
-    class BasicWeldJointInterface
-    {
-      protected:
-        BasicWeldJointInterface() = default;
-
-      public:
-        /// Set weld joint angular damping ratio, non-dimensional
-        void SetAngularDampingRatio(float dampingRatio) /*non-const*/ requires (!ForceConst);
-
-        /// Get the weld joint angular damping ratio, non-dimensional
-        [[nodiscard]] float GetAngularDampingRatio() const;
-
-        /// Set the weld joint angular stiffness in Hertz. 0 is rigid.
-        void SetAngularHertz(float hertz) /*non-const*/ requires (!ForceConst);
-
-        /// Get the weld joint angular stiffness in Hertz
-        [[nodiscard]] float GetAngularHertz() const;
-
-        /// Set the weld joint linear damping ratio (non-dimensional)
-        void SetLinearDampingRatio(float dampingRatio) /*non-const*/ requires (!ForceConst);
-
-        /// Get the weld joint linear damping ratio (non-dimensional)
-        [[nodiscard]] float GetLinearDampingRatio() const;
-
-        /// Set the weld joint linear stiffness in Hertz. 0 is rigid.
-        void SetLinearHertz(float hertz) /*non-const*/ requires (!ForceConst);
-
-        /// Get the weld joint linear stiffness in Hertz
-        [[nodiscard]] float GetLinearHertz() const;
-    };
-
-    /// Weld joint definition
-    /// Connects two bodies together rigidly. This constraint provides springs to mimic
-    /// soft-body simulation.
-    /// @note The approximate solver in Box2D cannot hold many bodies together rigidly
-    /// @ingroup weld_joint
-    class WeldJoint : public Joint, public BasicWeldJointInterface<WeldJoint, false>
-    {
-        template <typename, bool>
-        friend class BasicWeldJointInterface;
-        template <typename, bool>
-        friend class BasicWorldInterface;
-
-      public:
-        static constexpr bool IsOwning = true;
-
-        // Constructs a null (invalid) object.
-        constexpr WeldJoint() noexcept {}
-
-        // The constructor accepts either this or directly `b2WeldJointDef`.
-        struct Params : b2WeldJointDef
-        {
-            Params() : b2WeldJointDef(b2DefaultWeldJointDef()) {}
-        };
-
-        // Downcast from a generic joint.
-        // Triggers an assertion if this isn't the right joint kind.
-        explicit WeldJoint(Joint&& other) noexcept
-        {
-            if (!other || other.GetType() == b2_weldJoint)
-                this->id = std::exchange(other.id, {});
-            else
-                BOX2CPP_ASSERT(false && "This joint is not a `WeldJoint`.");
-        }
-    };
-
-    template <bool IsConstRef>
-    class MaybeConstWeldJointRef : public MaybeConstJointRef<IsConstRef>, public BasicWeldJointInterface<WeldJointRef, IsConstRef>
-    {
-        template <typename, bool>
-        friend class BasicWeldJointInterface;
-
-      public:
-        static constexpr bool IsOwning = false;
-        static constexpr bool IsConst = IsConstRef;
-
-        // Constructs a null (invalid) object.
-        constexpr MaybeConstWeldJointRef() noexcept {}
-
-        // Point to an existing handle.
-        // Using a `same_as` template to prevent implicit madness. In particular, to prevent const-to-non-const conversions between non-owning wrappers.
-        // Downcast from a generic joint reference (or owning joint).
-        // Triggers an assertion if this isn't the right joint kind.
-        explicit constexpr MaybeConstWeldJointRef(std::same_as<b2JointId> auto id) noexcept
-        {
-            if (B2_IS_NULL(id) || b2Joint_GetType(id) == b2_weldJoint)
-                this->id = id;
-            else
-                BOX2CPP_ASSERT(false && "This joint is not a `WeldJoint`.");
-        }
-
-        // Create from a non-reference.
-        constexpr MaybeConstWeldJointRef(const WeldJoint& other) noexcept : MaybeConstWeldJointRef(other.Handle()) {}
-
-        // Triggers an assertion if this isn't the right joint kind.
-        explicit constexpr MaybeConstWeldJointRef(MaybeConstJointRef<IsConstRef> other) noexcept : MaybeConstWeldJointRef(other.Handle()) {}
-        // Convert a non-const reference to a const reference.
-        constexpr MaybeConstWeldJointRef(const MaybeConstWeldJointRef<!IsConstRef>& other) noexcept requires IsConstRef : MaybeConstWeldJointRef(other.Handle()) {}
-    };
-
-    template <typename D, bool ForceConst>
-    class BasicWheelJointInterface
-    {
-      protected:
-        BasicWheelJointInterface() = default;
-
-      public:
-        /// Enable/disable the wheel joint limit
-        void EnableLimit(bool enableLimit) /*non-const*/ requires (!ForceConst);
-
-        /// Is the wheel joint limit enabled?
-        [[nodiscard]] bool IsLimitEnabled() const;
-
-        /// Set the wheel joint limits
-        void SetLimits(float lower, float upper) /*non-const*/ requires (!ForceConst);
-
-        /// Get the wheel joint lower limit
-        [[nodiscard]] float GetLowerLimit() const;
-
-        /// Set the wheel joint maximum motor torque, usually in newton-meters
-        void SetMaxMotorTorque(float torque) /*non-const*/ requires (!ForceConst);
-
-        /// Get the wheel joint maximum motor torque, usually in newton-meters
-        [[nodiscard]] float GetMaxMotorTorque() const;
-
-        /// Enable/disable the wheel joint motor
-        void EnableMotor(bool enableMotor) /*non-const*/ requires (!ForceConst);
-
-        /// Is the wheel joint motor enabled?
-        [[nodiscard]] bool IsMotorEnabled() const;
-
-        /// Set the wheel joint motor speed in radians per second
-        void SetMotorSpeed(float motorSpeed) /*non-const*/ requires (!ForceConst);
-
-        /// Get the wheel joint motor speed in radians per second
-        [[nodiscard]] float GetMotorSpeed() const;
-
-        /// Get the wheel joint current motor torque, usually in newton-meters
-        [[nodiscard]] float GetMotorTorque() const;
-
-        /// Enable/disable the wheel joint spring
-        void EnableSpring(bool enableSpring) /*non-const*/ requires (!ForceConst);
-
-        /// Is the wheel joint spring enabled?
-        [[nodiscard]] bool IsSpringEnabled() const;
-
-        /// Set the wheel joint damping ratio, non-dimensional
-        void SetSpringDampingRatio(float dampingRatio) /*non-const*/ requires (!ForceConst);
-
-        /// Get the wheel joint damping ratio, non-dimensional
-        [[nodiscard]] float GetSpringDampingRatio() const;
-
-        /// Set the wheel joint stiffness in Hertz
-        void SetSpringHertz(float hertz) /*non-const*/ requires (!ForceConst);
-
-        /// Get the wheel joint stiffness in Hertz
-        [[nodiscard]] float GetSpringHertz() const;
-
-        /// Get the wheel joint upper limit
-        [[nodiscard]] float GetUpperLimit() const;
-    };
-
-    /// Wheel joint definition
-    /// Body B is a wheel that may rotate freely and slide along the local x-axis in frame A.
-    /// The joint translation is zero when the local frame origins coincide in world space.
-    /// @ingroup wheel_joint
-    class WheelJoint : public Joint, public BasicWheelJointInterface<WheelJoint, false>
-    {
-        template <typename, bool>
-        friend class BasicWheelJointInterface;
-        template <typename, bool>
-        friend class BasicWorldInterface;
-
-      public:
-        static constexpr bool IsOwning = true;
-
-        // Constructs a null (invalid) object.
-        constexpr WheelJoint() noexcept {}
-
-        // The constructor accepts either this or directly `b2WheelJointDef`.
-        struct Params : b2WheelJointDef
-        {
-            Params() : b2WheelJointDef(b2DefaultWheelJointDef()) {}
-        };
-
-        // Downcast from a generic joint.
-        // Triggers an assertion if this isn't the right joint kind.
-        explicit WheelJoint(Joint&& other) noexcept
-        {
-            if (!other || other.GetType() == b2_wheelJoint)
-                this->id = std::exchange(other.id, {});
-            else
-                BOX2CPP_ASSERT(false && "This joint is not a `WheelJoint`.");
-        }
-    };
-
-    template <bool IsConstRef>
-    class MaybeConstWheelJointRef : public MaybeConstJointRef<IsConstRef>, public BasicWheelJointInterface<WheelJointRef, IsConstRef>
-    {
-        template <typename, bool>
-        friend class BasicWheelJointInterface;
-
-      public:
-        static constexpr bool IsOwning = false;
-        static constexpr bool IsConst = IsConstRef;
-
-        // Constructs a null (invalid) object.
-        constexpr MaybeConstWheelJointRef() noexcept {}
-
-        // Point to an existing handle.
-        // Using a `same_as` template to prevent implicit madness. In particular, to prevent const-to-non-const conversions between non-owning wrappers.
-        // Downcast from a generic joint reference (or owning joint).
-        // Triggers an assertion if this isn't the right joint kind.
-        explicit constexpr MaybeConstWheelJointRef(std::same_as<b2JointId> auto id) noexcept
-        {
-            if (B2_IS_NULL(id) || b2Joint_GetType(id) == b2_wheelJoint)
-                this->id = id;
-            else
-                BOX2CPP_ASSERT(false && "This joint is not a `WheelJoint`.");
-        }
-
-        // Create from a non-reference.
-        constexpr MaybeConstWheelJointRef(const WheelJoint& other) noexcept : MaybeConstWheelJointRef(other.Handle()) {}
-
-        // Triggers an assertion if this isn't the right joint kind.
-        explicit constexpr MaybeConstWheelJointRef(MaybeConstJointRef<IsConstRef> other) noexcept : MaybeConstWheelJointRef(other.Handle()) {}
-        // Convert a non-const reference to a const reference.
-        constexpr MaybeConstWheelJointRef(const MaybeConstWheelJointRef<!IsConstRef>& other) noexcept requires IsConstRef : MaybeConstWheelJointRef(other.Handle()) {}
     };
 
     template <typename D, bool ForceConst>
@@ -1783,6 +1786,7 @@ namespace b2
 
       protected:
         b2BodyId id{};
+        void ExchangeId(Body& other) { this->id = std::exchange(other.id, {}); };
 
       public:
         static constexpr bool IsOwning = true;
@@ -1827,6 +1831,122 @@ namespace b2
 
         // Convert a non-const reference to a const reference.
         constexpr MaybeConstBodyRef(const MaybeConstBodyRef<!IsConstRef>& other) noexcept requires IsConstRef : MaybeConstBodyRef(other.Handle()) {}
+    };
+
+    /// The dynamic tree structure. This should be considered private data.
+    /// It is placed here for performance reasons.
+    class DynamicTree
+    {
+        b2DynamicTree value{};
+
+      public:
+        // Consturcts a null (invalid) object.
+        constexpr DynamicTree() {}
+
+        /// Constructing the tree initializes the node pool.
+        DynamicTree(std::nullptr_t) : value(b2DynamicTree_Create()) {}
+
+        DynamicTree(DynamicTree&& other) noexcept : value(other.value) { other.value = {}; }
+        DynamicTree& operator=(DynamicTree&& other) noexcept
+        {
+            if (this == &other) return *this;
+            if (*this) b2DynamicTree_Destroy(&value);
+            value = other.value;
+            other.value = {};
+            return *this;
+        }
+
+        /// Destroy the tree, freeing the node pool.
+        ~DynamicTree() { if (*this) b2DynamicTree_Destroy(&value); }
+
+        [[nodiscard]] explicit operator bool() const { return bool( value.nodes ); }
+        [[nodiscard]]       b2DynamicTree *RawTreePtr()       { return *this ? &value : nullptr; }
+        [[nodiscard]] const b2DynamicTree *RawTreePtr() const { return *this ? &value : nullptr; }
+
+        /// Get the AABB of a proxy
+        [[nodiscard]] b2AABB GetAABB(int proxyId) const;
+
+        /// Get the ratio of the sum of the node areas to the root area.
+        [[nodiscard]] float GetAreaRatio() const;
+
+        /// Get the number of bytes used by this tree
+        [[nodiscard]] int GetByteCount() const;
+
+        /// Modify the category bits on a proxy. This is an expensive operation.
+        void SetCategoryBits(int proxyId, uint64_t categoryBits);
+
+        /// Get the category bits on a proxy.
+        [[nodiscard]] uint64_t GetCategoryBits(int proxyId);
+
+        /// Create a proxy. Provide an AABB and a userData value.
+        [[nodiscard]] int CreateProxy(b2AABB aabb, uint64_t categoryBits, uint64_t userData);
+
+        /// Destroy a proxy. This asserts if the id is invalid.
+        void DestroyProxy(int proxyId);
+
+        /// Enlarge a proxy and enlarge ancestors as necessary.
+        void EnlargeProxy(int proxyId, b2AABB aabb);
+
+        /// Get the height of the binary tree.
+        [[nodiscard]] int GetHeight() const;
+
+        /// Move a proxy to a new AABB by removing and reinserting into the tree.
+        void MoveProxy(int proxyId, b2AABB aabb);
+
+        /// Get the number of proxies created
+        [[nodiscard]] int GetProxyCount() const;
+
+        /// Query an AABB for overlapping proxies. The callback class is called for each proxy that overlaps the supplied AABB.
+        ///	@return performance data
+        b2TreeStats Query(b2AABB aabb, uint64_t maskBits, b2TreeQueryCallbackFcn* callback, void* context) const;
+
+        /// Query an AABB for overlapping proxies. The callback class is called for each proxy that overlaps the supplied AABB.
+        /// No filtering is performed.
+        ///	@return performance data
+        b2TreeStats QueryAll(b2AABB aabb, b2TreeQueryCallbackFcn* callback, void* context) const;
+
+        /// Ray cast against the proxies in the tree. This relies on the callback
+        /// to perform a exact ray cast in the case were the proxy contains a shape.
+        /// The callback also performs the any collision filtering. This has performance
+        /// roughly equal to k * log(n), where k is the number of collisions and n is the
+        /// number of proxies in the tree.
+        /// Bit-wise filtering using mask bits can greatly improve performance in some scenarios.
+        ///	However, this filtering may be approximate, so the user should still apply filtering to results.
+        /// @param tree the dynamic tree to ray cast
+        /// @param input the ray cast input data. The ray extends from p1 to p1 + maxFraction * (p2 - p1)
+        /// @param maskBits mask bit hint: `bool accept = (maskBits & node->categoryBits) != 0;`
+        /// @param callback a callback class that is called for each proxy that is hit by the ray
+        /// @param context user context that is passed to the callback
+        ///	@return performance data
+        b2TreeStats RayCast(const b2RayCastInput& input, uint64_t maskBits, b2TreeRayCastCallbackFcn* callback, void* context) const;
+
+        /// Rebuild the tree while retaining subtrees that haven't changed. Returns the number of boxes sorted.
+        int Rebuild(bool fullBuild);
+
+        /// Get the bounding box that contains the entire tree
+        [[nodiscard]] b2AABB GetRootBounds() const;
+
+        /// Ray cast against the proxies in the tree. This relies on the callback
+        /// to perform a exact ray cast in the case were the proxy contains a shape.
+        /// The callback also performs the any collision filtering. This has performance
+        /// roughly equal to k * log(n), where k is the number of collisions and n is the
+        /// number of proxies in the tree.
+        /// @param tree the dynamic tree to ray cast
+        /// @param input the ray cast input data. The ray extends from p1 to p1 + maxFraction * (p2 - p1).
+        /// @param maskBits filter bits: `bool accept = (maskBits & node->categoryBits) != 0;`
+        /// @param callback a callback class that is called for each proxy that is hit by the shape
+        /// @param context user context that is passed to the callback
+        ///	@return performance data
+        b2TreeStats ShapeCast(const b2ShapeCastInput& input, uint64_t maskBits, b2TreeShapeCastCallbackFcn* callback, void* context) const;
+
+        /// Get proxy user data
+        [[nodiscard]] uint64_t GetUserData(int proxyId) const;
+
+        /// Validate this tree. For testing.
+        void Validate() const;
+
+        /// Validate this tree has no enlarged AABBs. For testing.
+        void ValidateNoEnlarged() const;
     };
 
     template <typename D, bool ForceConst>
@@ -2066,6 +2186,7 @@ namespace b2
 
       protected:
         b2WorldId id{};
+        void ExchangeId(World& other) { this->id = std::exchange(other.id, {}); };
 
       public:
         static constexpr bool IsOwning = true;
@@ -2115,122 +2236,6 @@ namespace b2
 
         // Convert a non-const reference to a const reference.
         constexpr MaybeConstWorldRef(const MaybeConstWorldRef<!IsConstRef>& other) noexcept requires IsConstRef : MaybeConstWorldRef(other.Handle()) {}
-    };
-
-    /// The dynamic tree structure. This should be considered private data.
-    /// It is placed here for performance reasons.
-    class DynamicTree
-    {
-        b2DynamicTree value{};
-
-      public:
-        // Consturcts a null (invalid) object.
-        constexpr DynamicTree() {}
-
-        /// Constructing the tree initializes the node pool.
-        DynamicTree(std::nullptr_t) : value(b2DynamicTree_Create()) {}
-
-        DynamicTree(DynamicTree&& other) noexcept : value(other.value) { other.value = {}; }
-        DynamicTree& operator=(DynamicTree&& other) noexcept
-        {
-            if (this == &other) return *this;
-            if (*this) b2DynamicTree_Destroy(&value);
-            value = other.value;
-            other.value = {};
-            return *this;
-        }
-
-        /// Destroy the tree, freeing the node pool.
-        ~DynamicTree() { if (*this) b2DynamicTree_Destroy(&value); }
-
-        [[nodiscard]] explicit operator bool() const { return bool( value.nodes ); }
-        [[nodiscard]]       b2DynamicTree *RawTreePtr()       { return *this ? &value : nullptr; }
-        [[nodiscard]] const b2DynamicTree *RawTreePtr() const { return *this ? &value : nullptr; }
-
-        /// Get the AABB of a proxy
-        [[nodiscard]] b2AABB GetAABB(int proxyId) const;
-
-        /// Get the ratio of the sum of the node areas to the root area.
-        [[nodiscard]] float GetAreaRatio() const;
-
-        /// Get the number of bytes used by this tree
-        [[nodiscard]] int GetByteCount() const;
-
-        /// Modify the category bits on a proxy. This is an expensive operation.
-        void SetCategoryBits(int proxyId, uint64_t categoryBits);
-
-        /// Get the category bits on a proxy.
-        [[nodiscard]] uint64_t GetCategoryBits(int proxyId);
-
-        /// Create a proxy. Provide an AABB and a userData value.
-        [[nodiscard]] int CreateProxy(b2AABB aabb, uint64_t categoryBits, uint64_t userData);
-
-        /// Destroy a proxy. This asserts if the id is invalid.
-        void DestroyProxy(int proxyId);
-
-        /// Enlarge a proxy and enlarge ancestors as necessary.
-        void EnlargeProxy(int proxyId, b2AABB aabb);
-
-        /// Get the height of the binary tree.
-        [[nodiscard]] int GetHeight() const;
-
-        /// Move a proxy to a new AABB by removing and reinserting into the tree.
-        void MoveProxy(int proxyId, b2AABB aabb);
-
-        /// Get the number of proxies created
-        [[nodiscard]] int GetProxyCount() const;
-
-        /// Query an AABB for overlapping proxies. The callback class is called for each proxy that overlaps the supplied AABB.
-        ///	@return performance data
-        b2TreeStats Query(b2AABB aabb, uint64_t maskBits, b2TreeQueryCallbackFcn* callback, void* context) const;
-
-        /// Query an AABB for overlapping proxies. The callback class is called for each proxy that overlaps the supplied AABB.
-        /// No filtering is performed.
-        ///	@return performance data
-        b2TreeStats QueryAll(b2AABB aabb, b2TreeQueryCallbackFcn* callback, void* context) const;
-
-        /// Ray cast against the proxies in the tree. This relies on the callback
-        /// to perform a exact ray cast in the case were the proxy contains a shape.
-        /// The callback also performs the any collision filtering. This has performance
-        /// roughly equal to k * log(n), where k is the number of collisions and n is the
-        /// number of proxies in the tree.
-        /// Bit-wise filtering using mask bits can greatly improve performance in some scenarios.
-        ///	However, this filtering may be approximate, so the user should still apply filtering to results.
-        /// @param tree the dynamic tree to ray cast
-        /// @param input the ray cast input data. The ray extends from p1 to p1 + maxFraction * (p2 - p1)
-        /// @param maskBits mask bit hint: `bool accept = (maskBits & node->categoryBits) != 0;`
-        /// @param callback a callback class that is called for each proxy that is hit by the ray
-        /// @param context user context that is passed to the callback
-        ///	@return performance data
-        b2TreeStats RayCast(const b2RayCastInput& input, uint64_t maskBits, b2TreeRayCastCallbackFcn* callback, void* context) const;
-
-        /// Rebuild the tree while retaining subtrees that haven't changed. Returns the number of boxes sorted.
-        int Rebuild(bool fullBuild);
-
-        /// Get the bounding box that contains the entire tree
-        [[nodiscard]] b2AABB GetRootBounds() const;
-
-        /// Ray cast against the proxies in the tree. This relies on the callback
-        /// to perform a exact ray cast in the case were the proxy contains a shape.
-        /// The callback also performs the any collision filtering. This has performance
-        /// roughly equal to k * log(n), where k is the number of collisions and n is the
-        /// number of proxies in the tree.
-        /// @param tree the dynamic tree to ray cast
-        /// @param input the ray cast input data. The ray extends from p1 to p1 + maxFraction * (p2 - p1).
-        /// @param maskBits filter bits: `bool accept = (maskBits & node->categoryBits) != 0;`
-        /// @param callback a callback class that is called for each proxy that is hit by the shape
-        /// @param context user context that is passed to the callback
-        ///	@return performance data
-        b2TreeStats ShapeCast(const b2ShapeCastInput& input, uint64_t maskBits, b2TreeShapeCastCallbackFcn* callback, void* context) const;
-
-        /// Get proxy user data
-        [[nodiscard]] uint64_t GetUserData(int proxyId) const;
-
-        /// Validate this tree. For testing.
-        void Validate() const;
-
-        /// Validate this tree has no enlarged AABBs. For testing.
-        void ValidateNoEnlarged() const;
     };
 } // namespace box2d
 
@@ -2325,6 +2330,32 @@ namespace b2
     template <typename D, bool ForceConst> void BasicJointInterface<D, ForceConst>::WakeBodies() requires (!ForceConst) { b2Joint_WakeBodies(static_cast<const D &>(*this).Handle()); }
     template <typename D, bool ForceConst> WorldRef BasicJointInterface<D, ForceConst>::GetWorld() requires (!ForceConst) { return b2Joint_GetWorld(static_cast<const D &>(*this).Handle()); }
     template <typename D, bool ForceConst> WorldConstRef BasicJointInterface<D, ForceConst>::GetWorld() const { return b2Joint_GetWorld(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> void BasicWeldJointInterface<D, ForceConst>::SetAngularDampingRatio(float dampingRatio) requires (!ForceConst) { b2WeldJoint_SetAngularDampingRatio(static_cast<const D &>(*this).Handle(), dampingRatio); }
+    template <typename D, bool ForceConst> float BasicWeldJointInterface<D, ForceConst>::GetAngularDampingRatio() const { return b2WeldJoint_GetAngularDampingRatio(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> void BasicWeldJointInterface<D, ForceConst>::SetAngularHertz(float hertz) requires (!ForceConst) { b2WeldJoint_SetAngularHertz(static_cast<const D &>(*this).Handle(), hertz); }
+    template <typename D, bool ForceConst> float BasicWeldJointInterface<D, ForceConst>::GetAngularHertz() const { return b2WeldJoint_GetAngularHertz(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> void BasicWeldJointInterface<D, ForceConst>::SetLinearDampingRatio(float dampingRatio) requires (!ForceConst) { b2WeldJoint_SetLinearDampingRatio(static_cast<const D &>(*this).Handle(), dampingRatio); }
+    template <typename D, bool ForceConst> float BasicWeldJointInterface<D, ForceConst>::GetLinearDampingRatio() const { return b2WeldJoint_GetLinearDampingRatio(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> void BasicWeldJointInterface<D, ForceConst>::SetLinearHertz(float hertz) requires (!ForceConst) { b2WeldJoint_SetLinearHertz(static_cast<const D &>(*this).Handle(), hertz); }
+    template <typename D, bool ForceConst> float BasicWeldJointInterface<D, ForceConst>::GetLinearHertz() const { return b2WeldJoint_GetLinearHertz(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::EnableLimit(bool enableLimit) requires (!ForceConst) { b2WheelJoint_EnableLimit(static_cast<const D &>(*this).Handle(), enableLimit); }
+    template <typename D, bool ForceConst> bool BasicWheelJointInterface<D, ForceConst>::IsLimitEnabled() const { return b2WheelJoint_IsLimitEnabled(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::SetLimits(float lower, float upper) requires (!ForceConst) { b2WheelJoint_SetLimits(static_cast<const D &>(*this).Handle(), lower, upper); }
+    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetLowerLimit() const { return b2WheelJoint_GetLowerLimit(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::SetMaxMotorTorque(float torque) requires (!ForceConst) { b2WheelJoint_SetMaxMotorTorque(static_cast<const D &>(*this).Handle(), torque); }
+    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetMaxMotorTorque() const { return b2WheelJoint_GetMaxMotorTorque(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::EnableMotor(bool enableMotor) requires (!ForceConst) { b2WheelJoint_EnableMotor(static_cast<const D &>(*this).Handle(), enableMotor); }
+    template <typename D, bool ForceConst> bool BasicWheelJointInterface<D, ForceConst>::IsMotorEnabled() const { return b2WheelJoint_IsMotorEnabled(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::SetMotorSpeed(float motorSpeed) requires (!ForceConst) { b2WheelJoint_SetMotorSpeed(static_cast<const D &>(*this).Handle(), motorSpeed); }
+    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetMotorSpeed() const { return b2WheelJoint_GetMotorSpeed(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetMotorTorque() const { return b2WheelJoint_GetMotorTorque(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::EnableSpring(bool enableSpring) requires (!ForceConst) { b2WheelJoint_EnableSpring(static_cast<const D &>(*this).Handle(), enableSpring); }
+    template <typename D, bool ForceConst> bool BasicWheelJointInterface<D, ForceConst>::IsSpringEnabled() const { return b2WheelJoint_IsSpringEnabled(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::SetSpringDampingRatio(float dampingRatio) requires (!ForceConst) { b2WheelJoint_SetSpringDampingRatio(static_cast<const D &>(*this).Handle(), dampingRatio); }
+    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetSpringDampingRatio() const { return b2WheelJoint_GetSpringDampingRatio(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::SetSpringHertz(float hertz) requires (!ForceConst) { b2WheelJoint_SetSpringHertz(static_cast<const D &>(*this).Handle(), hertz); }
+    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetSpringHertz() const { return b2WheelJoint_GetSpringHertz(static_cast<const D &>(*this).Handle()); }
+    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetUpperLimit() const { return b2WheelJoint_GetUpperLimit(static_cast<const D &>(*this).Handle()); }
     template <typename D, bool ForceConst> float BasicDistanceJointInterface<D, ForceConst>::GetCurrentLength() const { return b2DistanceJoint_GetCurrentLength(static_cast<const D &>(*this).Handle()); }
     template <typename D, bool ForceConst> void BasicDistanceJointInterface<D, ForceConst>::SetLength(float length) requires (!ForceConst) { b2DistanceJoint_SetLength(static_cast<const D &>(*this).Handle(), length); }
     template <typename D, bool ForceConst> float BasicDistanceJointInterface<D, ForceConst>::GetLength() const { return b2DistanceJoint_GetLength(static_cast<const D &>(*this).Handle()); }
@@ -2411,32 +2442,6 @@ namespace b2
     template <typename D, bool ForceConst> void BasicRevoluteJointInterface<D, ForceConst>::SetTargetAngle(float angle) requires (!ForceConst) { b2RevoluteJoint_SetTargetAngle(static_cast<const D &>(*this).Handle(), angle); }
     template <typename D, bool ForceConst> float BasicRevoluteJointInterface<D, ForceConst>::GetTargetAngle() const { return b2RevoluteJoint_GetTargetAngle(static_cast<const D &>(*this).Handle()); }
     template <typename D, bool ForceConst> float BasicRevoluteJointInterface<D, ForceConst>::GetUpperLimit() const { return b2RevoluteJoint_GetUpperLimit(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> void BasicWeldJointInterface<D, ForceConst>::SetAngularDampingRatio(float dampingRatio) requires (!ForceConst) { b2WeldJoint_SetAngularDampingRatio(static_cast<const D &>(*this).Handle(), dampingRatio); }
-    template <typename D, bool ForceConst> float BasicWeldJointInterface<D, ForceConst>::GetAngularDampingRatio() const { return b2WeldJoint_GetAngularDampingRatio(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> void BasicWeldJointInterface<D, ForceConst>::SetAngularHertz(float hertz) requires (!ForceConst) { b2WeldJoint_SetAngularHertz(static_cast<const D &>(*this).Handle(), hertz); }
-    template <typename D, bool ForceConst> float BasicWeldJointInterface<D, ForceConst>::GetAngularHertz() const { return b2WeldJoint_GetAngularHertz(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> void BasicWeldJointInterface<D, ForceConst>::SetLinearDampingRatio(float dampingRatio) requires (!ForceConst) { b2WeldJoint_SetLinearDampingRatio(static_cast<const D &>(*this).Handle(), dampingRatio); }
-    template <typename D, bool ForceConst> float BasicWeldJointInterface<D, ForceConst>::GetLinearDampingRatio() const { return b2WeldJoint_GetLinearDampingRatio(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> void BasicWeldJointInterface<D, ForceConst>::SetLinearHertz(float hertz) requires (!ForceConst) { b2WeldJoint_SetLinearHertz(static_cast<const D &>(*this).Handle(), hertz); }
-    template <typename D, bool ForceConst> float BasicWeldJointInterface<D, ForceConst>::GetLinearHertz() const { return b2WeldJoint_GetLinearHertz(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::EnableLimit(bool enableLimit) requires (!ForceConst) { b2WheelJoint_EnableLimit(static_cast<const D &>(*this).Handle(), enableLimit); }
-    template <typename D, bool ForceConst> bool BasicWheelJointInterface<D, ForceConst>::IsLimitEnabled() const { return b2WheelJoint_IsLimitEnabled(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::SetLimits(float lower, float upper) requires (!ForceConst) { b2WheelJoint_SetLimits(static_cast<const D &>(*this).Handle(), lower, upper); }
-    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetLowerLimit() const { return b2WheelJoint_GetLowerLimit(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::SetMaxMotorTorque(float torque) requires (!ForceConst) { b2WheelJoint_SetMaxMotorTorque(static_cast<const D &>(*this).Handle(), torque); }
-    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetMaxMotorTorque() const { return b2WheelJoint_GetMaxMotorTorque(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::EnableMotor(bool enableMotor) requires (!ForceConst) { b2WheelJoint_EnableMotor(static_cast<const D &>(*this).Handle(), enableMotor); }
-    template <typename D, bool ForceConst> bool BasicWheelJointInterface<D, ForceConst>::IsMotorEnabled() const { return b2WheelJoint_IsMotorEnabled(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::SetMotorSpeed(float motorSpeed) requires (!ForceConst) { b2WheelJoint_SetMotorSpeed(static_cast<const D &>(*this).Handle(), motorSpeed); }
-    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetMotorSpeed() const { return b2WheelJoint_GetMotorSpeed(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetMotorTorque() const { return b2WheelJoint_GetMotorTorque(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::EnableSpring(bool enableSpring) requires (!ForceConst) { b2WheelJoint_EnableSpring(static_cast<const D &>(*this).Handle(), enableSpring); }
-    template <typename D, bool ForceConst> bool BasicWheelJointInterface<D, ForceConst>::IsSpringEnabled() const { return b2WheelJoint_IsSpringEnabled(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::SetSpringDampingRatio(float dampingRatio) requires (!ForceConst) { b2WheelJoint_SetSpringDampingRatio(static_cast<const D &>(*this).Handle(), dampingRatio); }
-    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetSpringDampingRatio() const { return b2WheelJoint_GetSpringDampingRatio(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> void BasicWheelJointInterface<D, ForceConst>::SetSpringHertz(float hertz) requires (!ForceConst) { b2WheelJoint_SetSpringHertz(static_cast<const D &>(*this).Handle(), hertz); }
-    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetSpringHertz() const { return b2WheelJoint_GetSpringHertz(static_cast<const D &>(*this).Handle()); }
-    template <typename D, bool ForceConst> float BasicWheelJointInterface<D, ForceConst>::GetUpperLimit() const { return b2WheelJoint_GetUpperLimit(static_cast<const D &>(*this).Handle()); }
     template <typename D, bool ForceConst> Chain BasicBodyInterface<D, ForceConst>::CreateChain(Tags::OwningHandle, const std::derived_from<b2ChainDef> auto& def) requires (!ForceConst) { Chain ret; ret.id = b2CreateChain(static_cast<const D &>(*this).Handle(), &def); return ret; }
     template <typename D, bool ForceConst> ChainRef BasicBodyInterface<D, ForceConst>::CreateChain(Tags::DestroyWithParent, const std::derived_from<b2ChainDef> auto& def) requires (!ForceConst) { return b2CreateChain(static_cast<const D &>(*this).Handle(), &def); }
     template <typename D, bool ForceConst> Shape BasicBodyInterface<D, ForceConst>::CreateShape(Tags::OwningHandle, const std::derived_from<b2ShapeDef> auto& def, const b2Capsule& capsule) requires (!ForceConst) { Shape ret; ret.id = b2CreateCapsuleShape(static_cast<const D &>(*this).Handle(), &def, &capsule); return ret; }
@@ -2514,6 +2519,26 @@ namespace b2
     template <typename D, bool ForceConst> b2Vec2 BasicBodyInterface<D, ForceConst>::GetWorldPoint(b2Vec2 localPoint) const { return b2Body_GetWorldPoint(static_cast<const D &>(*this).Handle(), localPoint); }
     template <typename D, bool ForceConst> b2Vec2 BasicBodyInterface<D, ForceConst>::GetWorldPointVelocity(b2Vec2 worldPoint) const { return b2Body_GetWorldPointVelocity(static_cast<const D &>(*this).Handle(), worldPoint); }
     template <typename D, bool ForceConst> b2Vec2 BasicBodyInterface<D, ForceConst>::GetWorldVector(b2Vec2 localVector) const { return b2Body_GetWorldVector(static_cast<const D &>(*this).Handle(), localVector); }
+    inline b2AABB DynamicTree::GetAABB(int proxyId) const { return b2DynamicTree_GetAABB(&value, proxyId); }
+    inline float DynamicTree::GetAreaRatio() const { return b2DynamicTree_GetAreaRatio(&value); }
+    inline int DynamicTree::GetByteCount() const { return b2DynamicTree_GetByteCount(&value); }
+    inline void DynamicTree::SetCategoryBits(int proxyId, uint64_t categoryBits) { b2DynamicTree_SetCategoryBits(&value, proxyId, categoryBits); }
+    inline uint64_t DynamicTree::GetCategoryBits(int proxyId) { return b2DynamicTree_GetCategoryBits(&value, proxyId); }
+    inline int DynamicTree::CreateProxy(b2AABB aabb, uint64_t categoryBits, uint64_t userData) { return b2DynamicTree_CreateProxy(&value, aabb, categoryBits, userData); }
+    inline void DynamicTree::DestroyProxy(int proxyId) { b2DynamicTree_DestroyProxy(&value, proxyId); }
+    inline void DynamicTree::EnlargeProxy(int proxyId, b2AABB aabb) { b2DynamicTree_EnlargeProxy(&value, proxyId, aabb); }
+    inline int DynamicTree::GetHeight() const { return b2DynamicTree_GetHeight(&value); }
+    inline void DynamicTree::MoveProxy(int proxyId, b2AABB aabb) { b2DynamicTree_MoveProxy(&value, proxyId, aabb); }
+    inline int DynamicTree::GetProxyCount() const { return b2DynamicTree_GetProxyCount(&value); }
+    inline b2TreeStats DynamicTree::Query(b2AABB aabb, uint64_t maskBits, b2TreeQueryCallbackFcn* callback, void* context) const { return b2DynamicTree_Query(&value, aabb, maskBits, callback, context); }
+    inline b2TreeStats DynamicTree::QueryAll(b2AABB aabb, b2TreeQueryCallbackFcn* callback, void* context) const { return b2DynamicTree_QueryAll(&value, aabb, callback, context); }
+    inline b2TreeStats DynamicTree::RayCast(const b2RayCastInput& input, uint64_t maskBits, b2TreeRayCastCallbackFcn* callback, void* context) const { return b2DynamicTree_RayCast(&value, &input, maskBits, callback, context); }
+    inline int DynamicTree::Rebuild(bool fullBuild) { return b2DynamicTree_Rebuild(&value, fullBuild); }
+    inline b2AABB DynamicTree::GetRootBounds() const { return b2DynamicTree_GetRootBounds(&value); }
+    inline b2TreeStats DynamicTree::ShapeCast(const b2ShapeCastInput& input, uint64_t maskBits, b2TreeShapeCastCallbackFcn* callback, void* context) const { return b2DynamicTree_ShapeCast(&value, &input, maskBits, callback, context); }
+    inline uint64_t DynamicTree::GetUserData(int proxyId) const { return b2DynamicTree_GetUserData(&value, proxyId); }
+    inline void DynamicTree::Validate() const { b2DynamicTree_Validate(&value); }
+    inline void DynamicTree::ValidateNoEnlarged() const { b2DynamicTree_ValidateNoEnlarged(&value); }
     template <typename D, bool ForceConst> Body BasicWorldInterface<D, ForceConst>::CreateBody(Tags::OwningHandle, const std::derived_from<b2BodyDef> auto& def) requires (!ForceConst) { Body ret; ret.id = b2CreateBody(static_cast<const D &>(*this).Handle(), &def); return ret; }
     template <typename D, bool ForceConst> BodyRef BasicWorldInterface<D, ForceConst>::CreateBody(Tags::DestroyWithParent, const std::derived_from<b2BodyDef> auto& def) requires (!ForceConst) { return b2CreateBody(static_cast<const D &>(*this).Handle(), &def); }
     template <typename D, bool ForceConst> DistanceJoint BasicWorldInterface<D, ForceConst>::CreateJoint(Tags::OwningHandle, const std::derived_from<b2DistanceJointDef> auto& def) requires (!ForceConst) { DistanceJoint ret; ret.id = b2CreateDistanceJoint(static_cast<const D &>(*this).Handle(), &def); return ret; }
@@ -2577,24 +2602,4 @@ namespace b2
     template <typename D, bool ForceConst> void* BasicWorldInterface<D, ForceConst>::GetUserData() const { return b2World_GetUserData(static_cast<const D &>(*this).Handle()); }
     template <typename D, bool ForceConst> void BasicWorldInterface<D, ForceConst>::EnableWarmStarting(bool flag) requires (!ForceConst) { b2World_EnableWarmStarting(static_cast<const D &>(*this).Handle(), flag); }
     template <typename D, bool ForceConst> bool BasicWorldInterface<D, ForceConst>::IsWarmStartingEnabled() const { return b2World_IsWarmStartingEnabled(static_cast<const D &>(*this).Handle()); }
-    inline b2AABB DynamicTree::GetAABB(int proxyId) const { return b2DynamicTree_GetAABB(&value, proxyId); }
-    inline float DynamicTree::GetAreaRatio() const { return b2DynamicTree_GetAreaRatio(&value); }
-    inline int DynamicTree::GetByteCount() const { return b2DynamicTree_GetByteCount(&value); }
-    inline void DynamicTree::SetCategoryBits(int proxyId, uint64_t categoryBits) { b2DynamicTree_SetCategoryBits(&value, proxyId, categoryBits); }
-    inline uint64_t DynamicTree::GetCategoryBits(int proxyId) { return b2DynamicTree_GetCategoryBits(&value, proxyId); }
-    inline int DynamicTree::CreateProxy(b2AABB aabb, uint64_t categoryBits, uint64_t userData) { return b2DynamicTree_CreateProxy(&value, aabb, categoryBits, userData); }
-    inline void DynamicTree::DestroyProxy(int proxyId) { b2DynamicTree_DestroyProxy(&value, proxyId); }
-    inline void DynamicTree::EnlargeProxy(int proxyId, b2AABB aabb) { b2DynamicTree_EnlargeProxy(&value, proxyId, aabb); }
-    inline int DynamicTree::GetHeight() const { return b2DynamicTree_GetHeight(&value); }
-    inline void DynamicTree::MoveProxy(int proxyId, b2AABB aabb) { b2DynamicTree_MoveProxy(&value, proxyId, aabb); }
-    inline int DynamicTree::GetProxyCount() const { return b2DynamicTree_GetProxyCount(&value); }
-    inline b2TreeStats DynamicTree::Query(b2AABB aabb, uint64_t maskBits, b2TreeQueryCallbackFcn* callback, void* context) const { return b2DynamicTree_Query(&value, aabb, maskBits, callback, context); }
-    inline b2TreeStats DynamicTree::QueryAll(b2AABB aabb, b2TreeQueryCallbackFcn* callback, void* context) const { return b2DynamicTree_QueryAll(&value, aabb, callback, context); }
-    inline b2TreeStats DynamicTree::RayCast(const b2RayCastInput& input, uint64_t maskBits, b2TreeRayCastCallbackFcn* callback, void* context) const { return b2DynamicTree_RayCast(&value, &input, maskBits, callback, context); }
-    inline int DynamicTree::Rebuild(bool fullBuild) { return b2DynamicTree_Rebuild(&value, fullBuild); }
-    inline b2AABB DynamicTree::GetRootBounds() const { return b2DynamicTree_GetRootBounds(&value); }
-    inline b2TreeStats DynamicTree::ShapeCast(const b2ShapeCastInput& input, uint64_t maskBits, b2TreeShapeCastCallbackFcn* callback, void* context) const { return b2DynamicTree_ShapeCast(&value, &input, maskBits, callback, context); }
-    inline uint64_t DynamicTree::GetUserData(int proxyId) const { return b2DynamicTree_GetUserData(&value, proxyId); }
-    inline void DynamicTree::Validate() const { b2DynamicTree_Validate(&value); }
-    inline void DynamicTree::ValidateNoEnlarged() const { b2DynamicTree_ValidateNoEnlarged(&value); }
 } // namespace box2d

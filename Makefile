@@ -1,12 +1,11 @@
-# `make` - generate the header.
+# `make BOX2D_DIR=/path/to/box2d` - generate the header from an existing checkout.
 # To run tests:
 # * Compile but not link:
-#     make run_tests SYNTAX_ONLY=1
+#     make run_tests BOX2D_DIR=/path/to/box2d SYNTAX_ONLY=1
 # * Compile, link and run:
-#     make run_tests FLAGS=-L/path/to/box2d/lib
+#     make run_tests BOX2D_DIR=/path/to/box2d FLAGS=-L/path/to/box2d/lib
 #       For MSVC, use FLAGS_CL instead of FLAGS.
 #   You can set `COMPILERS=...` to only test specific compilers.
-#   Set BOX2D_DIR to use an existing Box2D checkout, e.g. BOX2D_DIR=../box2d.
 #
 # Windows users should run this in MSYS2 `make`. To test MSVC, run `msys2_shell.cmd` inside VS developer prompt.
 
@@ -20,16 +19,13 @@ endif
 FLAGS :=
 FLAGS_CL :=
 
-BOX2D_DIR ?= box2d
-BOX2D_REF ?= v3.2.0
+ifeq ($(wildcard $(BOX2D_DIR)/include/box2d/box2d.h),)
+$(error Set BOX2D_DIR to an existing Box2D checkout, e.g. make BOX2D_DIR=../box2d)
+endif
 
 # Set to 1 to only compile the tests but don't link.
 SYNTAX_ONLY := 0
 override SYNTAX_ONLY := $(filter-out 0,$(SYNTAX_ONLY))
-
-# Clone the repo.
-box2d:
-	git clone --branch $(BOX2D_REF) https://github.com/erincatto/box2d box2d
 
 # Generate the file.
 include/box2cpp/box2cpp.h: $(BOX2D_DIR) $(wildcard $(BOX2D_DIR)/include/box2d/*.h) generator/generate.awk | include test

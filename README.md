@@ -70,7 +70,7 @@ If the header is outdated, you can regenerate it yourself. (See comment at the b
 
 Prerequisites: `git`, GNU `make`, `sed`, `perl`, `gawk` (GNU awk). On Windows, install that from MSYS2 and run inside MSYS2 terminal (or use WSL).
 
-Run `make`. It will clone Box2D `v3.2.0` to `./box2d` (or use the existing checkout), and regenerate `include/box2cpp/box2cpp.h`. Set `BOX2D_REF` to choose a different ref for a new clone. To use a checkout elsewhere, run `make BOX2D_DIR=../box2d`. The comments at the beginning of `Makefile` have instructions for running tests. Test double precision with `make run_tests BOX2D_DIR=../box2d SYNTAX_ONLY=1 COMPILERS=clang++ FLAGS=-DBOX2D_DOUBLE_PRECISION`.
+Run `make BOX2D_DIR=/path/to/box2d` to regenerate `include/box2cpp/box2cpp.h` from an existing Box2D `v3.2.0` checkout. `BOX2D_DIR` is required and resolved relative to the directory where `make` runs, e.g. `make BOX2D_DIR=../box2d` when using the checkout in box2d3-wasm. The comments at the beginning of `Makefile` have instructions for running tests. Test double precision with `make run_tests BOX2D_DIR=../box2d SYNTAX_ONLY=1 COMPILERS=clang++ FLAGS=-DBOX2D_DOUBLE_PRECISION`.
 
 </details>
 

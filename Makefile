@@ -6,6 +6,7 @@
 #     make run_tests FLAGS=-L/path/to/box2d/lib
 #       For MSVC, use FLAGS_CL instead of FLAGS.
 #   You can set `COMPILERS=...` to only test specific compilers.
+#   Set BOX2D_DIR to use an existing Box2D checkout, e.g. BOX2D_DIR=../box2d.
 #
 # Windows users should run this in MSYS2 `make`. To test MSVC, run `msys2_shell.cmd` inside VS developer prompt.
 
@@ -19,26 +20,28 @@ endif
 FLAGS :=
 FLAGS_CL :=
 
+BOX2D_DIR ?= box2d
+BOX2D_REF ?= v3.2.0
+
 # Set to 1 to only compile the tests but don't link.
 SYNTAX_ONLY := 0
 override SYNTAX_ONLY := $(filter-out 0,$(SYNTAX_ONLY))
 
 # Clone the repo.
 box2d:
-	rm -rf box2d
-	git clone https://github.com/erincatto/box2d
+	git clone --branch $(BOX2D_REF) https://github.com/erincatto/box2d box2d
 
 # Generate the file.
-include/box2cpp/box2cpp.h test/test_header.h &: box2d $(wildcard box2d/include/box2d/*.h) | include test
+include/box2cpp/box2cpp.h: $(BOX2D_DIR) $(wildcard $(BOX2D_DIR)/include/box2d/*.h) generator/generate.awk | include test
 	$(call, ### Strip the newlines inside parentheses, then give the result to awk.)
 	$(call, ### `box2d.h` is the primary header. `types.h` and `joint_types.h` are needed for `b2Default...Def` functions.)
 	$(call, ### Yes, `cat` will mangle first/last lines, but it doesn't matter.)
-	cat box2d/include/box2d/* \
-		| perl -pe 's/(\([^)]*)\n/$$1/' \
-		| gawk -f generator/generate.awk >include/box2cpp/box2cpp.h -vsecond_file=tmp.part2
+	cat $(BOX2D_DIR)/include/box2d/*.h \
+		| perl -pe 'while ((tr/(//) > (tr/)//)) { my $$n = <>; last unless defined $$n; chomp; $$n =~ s/^\s+//; $$_ .= " " . $$n; }' \
+		| gawk -vbox2d_dir="$(BOX2D_DIR)" -vsecond_file=tmp.part2 -f generator/generate.awk >include/box2cpp/box2cpp.h
 	cat tmp.part2 >>include/box2cpp/box2cpp.h
 	rm tmp.part2
-	sed 's|<box2d/\(.*\)>|"../box2d/include/box2d/\1"|' include/box2cpp/box2cpp.h >test/test_header.h
+	sed 's|<box2d/\(.*\)>|"$(abspath $(BOX2D_DIR))/include/box2d/\1"|' include/box2cpp/box2cpp.h >test/test_header.h
 
 # Directories:
 $(strip include) test:
@@ -51,14 +54,14 @@ $(strip include) test:
 generate: include/box2cpp/box2cpp.h
 
 override all_test_targets =
-override define test_snippet =
+define test_snippet
 .PHONY: test_$1
 test_$1: include/box2cpp/box2cpp.h
 	MSYS2_ARG_CONV_EXCL=* LANG= $1 test/test.cpp $(if $(filter %cl,$1)\
 		,/nologo /EHsc /std:c++latest /W4 /WX \
 			$(if $(SYNTAX_ONLY),/Zs,/link -lbox2d '/out:test/test_$1.exe') \
 			$(FLAGS_CL) \
-		,-std=c++20 -Wall -Wextra -pedantic-errors -Wconversion -Wextra-semi -Wdeprecated -Werror -g \
+		,-std=c++20 -I"$(BOX2D_DIR)/include" -Wall -Wextra -pedantic-errors -Wconversion -Wextra-semi -Wdeprecated -Werror -g \
 			$(if $(filter windows,$(TARGET_OS)),,-fsanitize=address -fsanitize=undefined) \
 			$(if $(SYNTAX_ONLY),-fsyntax-only,-lbox2d -o 'test/test_$1') \
 			$(FLAGS) \
@@ -71,8 +74,7 @@ $(eval override all_test_targets += test_$1)
 endef
 
 $(foreach c,$(COMPILERS),\
-	$(call,$(shell which $c >/dev/null 2>/dev/null))\
-	$(if $(filter 0,$(.SHELLSTATUS)),$(eval $(call test_snippet,$c)))\
+	$(if $(shell command -v $c 2>/dev/null),$(eval $(call test_snippet,$c)))\
 )
 
 .PHONY: run_tests

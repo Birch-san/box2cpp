@@ -129,9 +129,9 @@ concept CheckCallbacks = requires{
     requires Passes == requires(W w) { w.Overlap( b2Pos{}, b2AABB{}, b2DefaultQueryFilter(), [](P shape){ (void)shape; return bool{}; } ); };
 
     // Cast.
-    requires Passes == requires(W w) { w.Cast( b2Pos{}, b2ShapeProxy{}, b2Vec2{}, b2DefaultQueryFilter(), [](P shape, b2Vec2 point, b2Vec2 normal, float fraction){ (void)shape; (void)point; (void)normal; (void)fraction; return float{}; } ); };
+    requires Passes == requires(W w) { w.Cast( b2Pos{}, b2ShapeProxy{}, b2Vec2{}, b2DefaultQueryFilter(), [](P shape, b2Pos point, b2Vec2 normal, float fraction){ (void)shape; (void)point; (void)normal; (void)fraction; return float{}; } ); };
     // Raycast.
-    requires Passes == requires(W w) { w.CastRay( b2Pos{}, b2Vec2{}, b2DefaultQueryFilter(), [](P shape, b2Vec2 point, b2Vec2 normal, float fraction){ (void)shape; (void)point; (void)normal; (void)fraction; return float{}; } ); };
+    requires Passes == requires(W w) { w.CastRay( b2Pos{}, b2Vec2{}, b2DefaultQueryFilter(), [](P shape, b2Pos point, b2Vec2 normal, float fraction){ (void)shape; (void)point; (void)normal; (void)fraction; return float{}; } ); };
 };
 
 // Raw ID works for both const and non-const.
@@ -173,6 +173,14 @@ template class b2::BasicMotorJointInterface<b2::MotorJoint, false>;
 template class b2::MaybeConstMotorJointRef<false>;
 template class b2::MaybeConstMotorJointRef<true>;
 
+template class b2::BasicMoverJointInterface<b2::MoverJoint, false>;
+template class b2::MaybeConstMoverJointRef<false>;
+template class b2::MaybeConstMoverJointRef<true>;
+
+template class b2::BasicPogoJointInterface<b2::PogoJoint, false>;
+template class b2::MaybeConstPogoJointRef<false>;
+template class b2::MaybeConstPogoJointRef<true>;
+
 template class b2::BasicPrismaticJointInterface<b2::PrismaticJoint, false>;
 template class b2::MaybeConstPrismaticJointRef<false>;
 template class b2::MaybeConstPrismaticJointRef<true>;
@@ -196,7 +204,7 @@ int main()
     (void)w.Handle();
 
     // Just check that raycast compiles.
-    (void)w.CastRayClosest(b2Vec2{}, b2Vec2{}, b2DefaultQueryFilter());
+    (void)w.CastRayClosest(b2Pos{}, b2Vec2{}, b2DefaultQueryFilter());
 
     b2::Body::Params bp;
     bp.type = b2_dynamicBody;

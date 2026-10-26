@@ -1,12 +1,15 @@
 BEGIN {
-    own_version = "0.16"
+    own_version = "0.17"
+
+    if (!box2d_dir)
+        box2d_dir = "box2d"
 
     print "#pragma once"
     print ""
     print "// box2cpp, C++ bindings for box2d 3.x"
     printf "// Generated from box2d commit: "
 
-    "cd box2d && git log -1 --format=\"%h %(describe) %cs\"" | getline box2d_ver_desc
+    "git -C \"" box2d_dir "\" log -1 --format=\"%h %(describe) %cs\"" | getline box2d_ver_desc
     box2d_ver_desc = gensub(/^\s+/, "", 1, gensub(/\s+$/, "", 1, gensub(/\s{2,}/, " ", "g", box2d_ver_desc)))
     print box2d_ver_desc
     print "// Generator version: " own_version
@@ -43,6 +46,9 @@ BEGIN {
     forced_non_classes["Rot"] = 1
     forced_non_classes["AABB"] = 1
     forced_non_classes["Contact"] = 1
+    # These types are opaque in Box2D v3.2 and cannot be stored by value in a wrapper.
+    forced_non_classes["DynamicTree"] = 1
+    forced_non_classes["Replay"] = 1
 }
 
 # Collect enums.
@@ -58,6 +64,7 @@ cur_enum_name && /\{/ {next}
 cur_enum_name {
     if ($0 !~ /^\s*$/ && $0 !~ /^\s*\/\//)
     {
+        $0 = gensub(/\s*\/\/.*$/, "", 1, $0)
         # Extract name and value.
         match($0, /^\s*b2_(\w+)(\s*=\s*(\w+))?,?$/, elems)
         if (RLENGTH == -1)
@@ -466,9 +473,9 @@ function emit_func(func_name, type, func_variant_index, indent)
     {
         # When we don't have a pointer parameter, we have to guess constness from the name.
 
-        if (clean_func_name ~ /^(Get|Is|Compute|Are|Test|Extents|Contains|Union|Center|Cast|RayCast|Collide|Snapshot)($|[A-Z])/ || clean_func_name == "Draw")
+        if (clean_func_name ~ /^(Get|Is|Has|Overlap|Compute|Are|Test|Extents|Contains|Union|Center|Cast|RayCast|Collide|Snapshot)($|[A-Z])/ || clean_func_name ~ /^Draw($|[A-Z])/)
             is_const = 1
-        else if (clean_func_name ~ /^(Set|Enable|Apply|Disable|Reset|Wake|Create|Destroy|Enlarge|Explode|Dump|Rebuild|Clear|Restore|Start|Stop)($|[A-Z])/ || clean_func_name == "Step")
+        else if (clean_func_name ~ /^(Set|Enable|Apply|Disable|Reset|Wake|Create|Destroy|Enlarge|Explode|Dump|Rebuild|Clear|Restore|Start|Stop|Update|Restart|Seek|Step)($|[A-Z])/)
             is_const = 0
         else
         {
@@ -671,7 +678,7 @@ END {
             funcs[func_name]["params"][i]["is_callback"] = 0
             funcs[func_name]["params"][i]["is_callback_context"] = skip_context_param
             skip_context_param = 0
-            if (param_type ~ /^(b2CastResultFcn|b2OverlapResultFcn)\*$/)
+            if (param_type ~ /^b2(CastResult|OverlapResult)(Callback)?Fcn\*$/)
             {
                 funcs[func_name]["params"][i]["is_callback"] = 1
                 funcs[func_name]["accepts_const_nonconst_callback"] = 1

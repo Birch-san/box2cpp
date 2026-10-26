@@ -124,18 +124,14 @@ static_assert(std::constructible_from<b2::WeldJointConstRef, b2::JointConstRef>)
 template <typename W, typename P, bool Passes>
 concept CheckCallbacks = requires{
     // Overlap.
-    requires Passes == requires(W w) { w.Overlap( b2Circle{}, b2Transform{}, b2DefaultQueryFilter(), [](P shape){ (void)shape; return bool{}; } ); };
-    requires Passes == requires(W w) { w.Overlap( b2Capsule{}, b2Transform{}, b2DefaultQueryFilter(), [](P shape){ (void)shape; return bool{}; } ); };
-    requires Passes == requires(W w) { w.Overlap( b2Polygon{}, b2Transform{}, b2DefaultQueryFilter(), [](P shape){ (void)shape; return bool{}; } ); };
+    requires Passes == requires(W w) { w.Overlap( b2Pos{}, b2ShapeProxy{}, b2DefaultQueryFilter(), [](P shape){ (void)shape; return bool{}; } ); };
     // Overlap AABB.
-    requires Passes == requires(W w) { w.Overlap( b2AABB{}, b2DefaultQueryFilter(), [](P shape){ (void)shape; return bool{}; } ); };
+    requires Passes == requires(W w) { w.Overlap( b2Pos{}, b2AABB{}, b2DefaultQueryFilter(), [](P shape){ (void)shape; return bool{}; } ); };
 
     // Cast.
-    requires Passes == requires(W w) { w.Cast( b2Circle{}, b2Transform{}, b2Vec2{}, b2DefaultQueryFilter(), [](P shape, b2Vec2 point, b2Vec2 normal, float fraction){ (void)shape; (void)point; (void)normal; (void)fraction; return float{}; } ); };
-    requires Passes == requires(W w) { w.Cast( b2Capsule{}, b2Transform{}, b2Vec2{}, b2DefaultQueryFilter(), [](P shape, b2Vec2 point, b2Vec2 normal, float fraction){ (void)shape; (void)point; (void)normal; (void)fraction; return float{}; } ); };
-    requires Passes == requires(W w) { w.Cast( b2Polygon{}, b2Transform{}, b2Vec2{}, b2DefaultQueryFilter(), [](P shape, b2Vec2 point, b2Vec2 normal, float fraction){ (void)shape; (void)point; (void)normal; (void)fraction; return float{}; } ); };
+    requires Passes == requires(W w) { w.Cast( b2Pos{}, b2ShapeProxy{}, b2Vec2{}, b2DefaultQueryFilter(), [](P shape, b2Pos point, b2Vec2 normal, float fraction){ (void)shape; (void)point; (void)normal; (void)fraction; return float{}; } ); };
     // Raycast.
-    requires Passes == requires(W w) { w.CastRay( b2Vec2{}, b2Vec2{}, b2DefaultQueryFilter(), [](P shape, b2Vec2 point, b2Vec2 normal, float fraction){ (void)shape; (void)point; (void)normal; (void)fraction; return float{}; } ); };
+    requires Passes == requires(W w) { w.CastRay( b2Pos{}, b2Vec2{}, b2DefaultQueryFilter(), [](P shape, b2Pos point, b2Vec2 normal, float fraction){ (void)shape; (void)point; (void)normal; (void)fraction; return float{}; } ); };
 };
 
 // Raw ID works for both const and non-const.
@@ -149,13 +145,66 @@ static_assert(CheckCallbacks<      b2::World, b2::ShapeConstRef, true>);
 static_assert(CheckCallbacks<const b2::World, b2::ShapeConstRef, true>);
 
 
+template class b2::BasicWorldInterface<b2::World, false>;
+template class b2::MaybeConstWorldRef<false>;
+template class b2::MaybeConstWorldRef<true>;
+
+template class b2::BasicBodyInterface<b2::Body, false>;
+template class b2::MaybeConstBodyRef<false>;
+template class b2::MaybeConstBodyRef<true>;
+
+template class b2::BasicShapeInterface<b2::Shape, false>;
+template class b2::MaybeConstShapeRef<false>;
+template class b2::MaybeConstShapeRef<true>;
+
+template class b2::BasicChainInterface<b2::Chain, false>;
+template class b2::MaybeConstChainRef<false>;
+template class b2::MaybeConstChainRef<true>;
+
+template class b2::BasicJointInterface<b2::Joint, false>;
+template class b2::MaybeConstJointRef<false>;
+template class b2::MaybeConstJointRef<true>;
+
+template class b2::BasicDistanceJointInterface<b2::DistanceJoint, false>;
+template class b2::MaybeConstDistanceJointRef<false>;
+template class b2::MaybeConstDistanceJointRef<true>;
+
+template class b2::BasicMotorJointInterface<b2::MotorJoint, false>;
+template class b2::MaybeConstMotorJointRef<false>;
+template class b2::MaybeConstMotorJointRef<true>;
+
+template class b2::BasicMoverJointInterface<b2::MoverJoint, false>;
+template class b2::MaybeConstMoverJointRef<false>;
+template class b2::MaybeConstMoverJointRef<true>;
+
+template class b2::BasicPogoJointInterface<b2::PogoJoint, false>;
+template class b2::MaybeConstPogoJointRef<false>;
+template class b2::MaybeConstPogoJointRef<true>;
+
+template class b2::BasicPrismaticJointInterface<b2::PrismaticJoint, false>;
+template class b2::MaybeConstPrismaticJointRef<false>;
+template class b2::MaybeConstPrismaticJointRef<true>;
+
+template class b2::BasicRevoluteJointInterface<b2::RevoluteJoint, false>;
+template class b2::MaybeConstRevoluteJointRef<false>;
+template class b2::MaybeConstRevoluteJointRef<true>;
+
+template class b2::BasicWeldJointInterface<b2::WeldJoint, false>;
+template class b2::MaybeConstWeldJointRef<false>;
+template class b2::MaybeConstWeldJointRef<true>;
+
+template class b2::BasicWheelJointInterface<b2::WheelJoint, false>;
+template class b2::MaybeConstWheelJointRef<false>;
+template class b2::MaybeConstWheelJointRef<true>;
+
+
 int main()
 {
     b2::World w(b2::World::Params{});
     (void)w.Handle();
 
     // Just check that raycast compiles.
-    (void)w.CastRayClosest(b2Vec2{}, b2Vec2{}, b2DefaultQueryFilter());
+    (void)w.CastRayClosest(b2Pos{}, b2Vec2{}, b2DefaultQueryFilter());
 
     b2::Body::Params bp;
     bp.type = b2_dynamicBody;
@@ -179,8 +228,8 @@ int main()
     // Notice that we pass a lambda directly, without the `void* context` madness.
     std::string str = "Foo!";
     w.Overlap(
-        b2Circle{.center{}, .radius = 1},
-        b2Transform_identity,
+        b2Pos{0,0},
+        b2ShapeProxy{.points = {b2Vec2{0,0}}, .count = 1, .radius = 0},
         b2DefaultQueryFilter(),
         [&](b2::ShapeRef shape)
         {
@@ -195,8 +244,8 @@ int main()
     b2::Body b2 = w.CreateBody(b2::OwningHandle, bp);
 
     b2::WeldJoint::Params wjp;
-    wjp.bodyIdA = b;
-    wjp.bodyIdB = b2;
+    wjp.base.bodyIdA = b;
+    wjp.base.bodyIdB = b2;
     b2::WeldJoint wj = w.CreateJoint(b2::OwningHandle, wjp);
     assert(wj);
     b2::Joint bj = std::move(wj);

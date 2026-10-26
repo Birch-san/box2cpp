@@ -13,7 +13,6 @@ namespace b2
     //   Camera orientation has viable defaults for running simple examples.
     // * Call `.DrawShapes(world);` every frame to render the shapes.
     // * Call `.DrawModeToggles();` every frame to draw checkboxes for tweaking shape visualization.
-    // * Call `.MouseDrag(world);` every frame to enable dragging shapes with mouse. Also draws a checkbox to enable/disable it.
     class DebugImguiRenderer
     {
       public:
@@ -33,13 +32,6 @@ namespace b2
         // If true, the Y axis is inverted and points upwards instead of downwards.
         float y_axis_is_upwards = false;
 
-        // Drag bodies with mouse:
-
-        // If true, enable dragging shapes with the mouse. Must call `MouseDrag()` to do this, which also shows a checkbox for this value.
-        bool enable_mouse_drag = false;
-        // Which button to use for mouse dragging.
-        ImGuiMouseButton mouse_drag_button = ImGuiMouseButton_Left;
-
         // Render settings:
 
         // This thickness is used for all lines.
@@ -56,8 +48,6 @@ namespace b2
         ImVec4 transform_color_x = ImVec4(1, 0, 0, 1);
         ImVec4 transform_color_y = ImVec4(0, 1, 0, 1);
 
-        // Text color.
-        ImVec4 text_color = ImVec4(1, 1, 1, 1);
         // Text background color.
         ImVec4 text_bg_color = ImVec4(0, 0, 0, 0.5f);
         // Make background behind text larger than the text by this amount.
@@ -70,33 +60,36 @@ namespace b2
             callbacks.drawShapes = true;
             callbacks.drawJoints = true;
             callbacks.drawJointExtras = false;
-            callbacks.drawAABBs = false;
+            callbacks.drawBounds = false;
             callbacks.drawMass = true;
+            callbacks.drawBodyNames = true;
             callbacks.drawContacts = false;
             callbacks.drawGraphColors = false;
             callbacks.drawContactNormals = false;
             callbacks.drawContactImpulses = false;
+            callbacks.drawContactFeatures = false;
             callbacks.drawFrictionImpulses = false;
+            callbacks.drawIslands = false;
 
-            callbacks.DrawPolygon = [](const b2Vec2* vertices, int vertexCount, b2HexColor color, void* context)
+            callbacks.DrawPolygonFcn = [](const b2Vec2* vertices, int vertexCount, b2HexColor color, void* context)
             {
                 auto &self = *static_cast<DebugImguiRenderer *>(context);
                 self.DrawPolygon(vertices, vertexCount, color, 0, nullptr);
             };
 
-            callbacks.DrawSolidPolygon = [](b2Transform xf, const b2Vec2* vertices, int vertexCount, float radius, b2HexColor color, void* context)
+            callbacks.DrawSolidPolygonFcn = [](b2Transform xf, const b2Vec2* vertices, int vertexCount, float radius, b2HexColor color, void* context)
             {
                 auto &self = *static_cast<DebugImguiRenderer *>(context);
                 self.DrawPolygonFilled(vertices, vertexCount, color, radius, &xf);
             };
 
-            callbacks.DrawCircle = [](b2Vec2 center, float radius, b2HexColor color, void* context)
+            callbacks.DrawCircleFcn = [](b2Vec2 center, float radius, b2HexColor color, void* context)
             {
                 auto &self = *static_cast<DebugImguiRenderer *>(context);
                 self.DrawList().AddCircle(self.Box2dToImguiPoint(center), self.Box2dToImguiLength(radius), self.ShapeColorToImguiColor(color, false), 0, self.line_thickness);
             };
 
-            callbacks.DrawSolidCircle = [](b2Transform xf, float radius, b2HexColor color, void* context)
+            callbacks.DrawSolidCircleFcn = [](b2Transform xf, float radius, b2HexColor color, void* context)
             {
                 auto &self = *static_cast<DebugImguiRenderer *>(context);
                 self.DrawList().AddCircleFilled(self.Box2dToImguiPoint(xf.p), self.Box2dToImguiLength(radius), self.ShapeColorToImguiColor(color, true));
@@ -105,25 +98,26 @@ namespace b2
                 self.DrawLine(xf.p, b2Vec2(xf.p.x + xf.q.c * radius, xf.p.y + xf.q.s * radius), color);
             };
 
-            callbacks.DrawCapsule = [](b2Vec2 p1, b2Vec2 p2, float radius, b2HexColor color, void* context)
-            {
-                auto &self = *static_cast<DebugImguiRenderer *>(context);
-                self.DrawCapsule(p1, p2, radius, color);
-            };
+            // // Box2d seems to have removed this? Leaving this here for posterity.
+            // callbacks.DrawCapsuleFcn = [](b2Vec2 p1, b2Vec2 p2, float radius, b2HexColor color, void* context)
+            // {
+            //     auto &self = *static_cast<DebugImguiRenderer *>(context);
+            //     self.DrawCapsule(p1, p2, radius, color);
+            // };
 
-            callbacks.DrawSolidCapsule = [](b2Vec2 p1, b2Vec2 p2, float radius, b2HexColor color, void* context)
+            callbacks.DrawSolidCapsuleFcn = [](b2Vec2 p1, b2Vec2 p2, float radius, b2HexColor color, void* context)
             {
                 auto &self = *static_cast<DebugImguiRenderer *>(context);
                 self.DrawCapsuleFilled(p1, p2, radius, color);
             };
 
-            callbacks.DrawSegment = [](b2Vec2 p1, b2Vec2 p2, b2HexColor color, void* context)
+            callbacks.DrawSegmentFcn = [](b2Vec2 p1, b2Vec2 p2, b2HexColor color, void* context)
             {
                 auto &self = *static_cast<DebugImguiRenderer *>(context);
                 self.DrawLine(p1, p2, color);
             };
 
-            callbacks.DrawTransform = [](b2Transform xf, void* context)
+            callbacks.DrawTransformFcn = [](b2Transform xf, void* context)
             {
                 auto &self = *static_cast<DebugImguiRenderer *>(context);
                 ImVec2 p = self.Box2dToImguiPoint(xf.p);
@@ -139,7 +133,7 @@ namespace b2
             };
 
             /// Draw a point.
-            callbacks.DrawPoint = [](b2Vec2 p, float size, b2HexColor color, void* context)
+            callbacks.DrawPointFcn = [](b2Vec2 p, float size, b2HexColor color, void* context)
             {
                 auto &self = *static_cast<DebugImguiRenderer *>(context);
                 // Using `size` as is, it seems to be in pixels.
@@ -147,7 +141,7 @@ namespace b2
             };
 
             /// Draw a string.
-            callbacks.DrawString = [](b2Vec2 p, const char* s, void* context)
+            callbacks.DrawStringFcn = [](b2Vec2 p, const char* s, b2HexColor color, void* context)
             {
                 auto &self = *static_cast<DebugImguiRenderer *>(context);
 
@@ -173,7 +167,7 @@ namespace b2
                     ImGui::ColorConvertFloat4ToU32(self.text_bg_color),
                     (self.text_background_padding.x + self.text_background_padding.y) / 2 // Guess a decent rounding.
                 );
-                self.DrawList().AddText(text_pos, ImGui::ColorConvertFloat4ToU32(self.text_color), s);
+                self.DrawList().AddText(text_pos, self.ShapeColorToImguiColor(color, false), s);
             };
         }
 
@@ -218,66 +212,19 @@ namespace b2
             ImGui::Checkbox("Shapes", &callbacks.drawShapes);
             ImGui::Checkbox("Joints", &callbacks.drawJoints);
             ImGui::Checkbox("Joint extras", &callbacks.drawJointExtras);
-            ImGui::Checkbox("AABBs", &callbacks.drawAABBs);
+            ImGui::Checkbox("Bounds", &callbacks.drawBounds);
             ImGui::Checkbox("Mass", &callbacks.drawMass);
+            ImGui::Checkbox("Body names", &callbacks.drawBodyNames);
             ImGui::Checkbox("Contacts", &callbacks.drawContacts);
             ImGui::Checkbox("Graph colors", &callbacks.drawGraphColors);
             ImGui::Checkbox("Contact normals", &callbacks.drawContactNormals);
             ImGui::Checkbox("Contact impulses", &callbacks.drawContactImpulses);
+            ImGui::Checkbox("Contact features", &callbacks.drawContactFeatures);
             ImGui::Checkbox("Friction impulses", &callbacks.drawFrictionImpulses);
+            ImGui::Checkbox("Islands", &callbacks.drawIslands);
             ImGui::Separator(); // In case we draw multiple windows.
 
             ImGui::End();
-        }
-
-        // Perform mouse drag and draw a checkbox to enable/disable it.
-        void MouseDrag(b2::WorldRef world)
-        {
-            // Draw toggle.
-            ImGui::Begin("box2d debug render");
-
-            ImGui::Checkbox("Mouse drag", &enable_mouse_drag);
-            ImGui::Separator(); // In case we draw multiple windows.
-
-            ImGui::End();
-
-            // Initiate.
-            if (enable_mouse_drag && !mouse_joint && ImGui::IsMouseClicked(mouse_drag_button))
-            {
-                b2Vec2 point = ImguiToBox2dPoint(ImGui::GetMousePos());
-                b2::ShapeRef target;
-                world.Overlap(b2Circle{.center = {}, .radius = 0}, b2Transform{.p = point, .q = {0,1}}, b2DefaultQueryFilter(),
-                    [&](b2::ShapeRef shape)
-                    {
-                        target = shape;
-                        return false;
-                    }
-                );
-
-                if (target && target.GetBody().GetType() == b2_dynamicBody)
-                {
-                    mouse_joint_body = world.CreateBody(b2::OwningHandle, b2::Body::Params{});
-                    b2::MouseJoint::Params joint_params{};
-                    joint_params.bodyIdA = mouse_joint_body;
-                    joint_params.bodyIdB = target.GetBody();
-                    joint_params.target = point;
-                    joint_params.maxForce = 1000.0f * target.GetBody().GetMass();
-                    mouse_joint = world.CreateJoint(b2::DestroyWithParent, joint_params);
-                }
-            }
-            // Finish.
-            if (mouse_joint && !ImGui::IsMouseDown(mouse_drag_button))
-            {
-                mouse_joint = {};
-                mouse_joint_body = {};
-            }
-            // Continue drag.
-            if (mouse_joint)
-            {
-                mouse_joint.SetTarget(ImguiToBox2dPoint(ImGui::GetMousePos()));
-                mouse_joint.GetBodyB().SetAwake(true); // Poke the body to stop it from sleeping.
-                ImGui::SetNextFrameWantCaptureMouse(true);
-            }
         }
 
         // Coordinate conversions:
@@ -412,9 +359,5 @@ namespace b2
             DrawList().PathFillConvex(ShapeColorToImguiColor(color, true));
             DrawCapsule(p1, p2, radius, color);
         }
-
-        // Mouse drag state:
-        b2::MouseJointRef mouse_joint;
-        b2::Body mouse_joint_body;
     };
 }

@@ -2,7 +2,9 @@
 
 **C++ bindings for [box2d 3.x](https://github.com/erincatto/box2d) physics engine (aka box2c)**
 
-* Provides classes for all box2d entities: `World`, `Body`, `Shape`, `Chain`, all joint kinds, `DynamicTree`.
+* Provides classes for Box2D entities: `World`, `Body`, `Shape`, `Chain`, all joint kinds (including mover and pogo joints), and `Recording`.
+
+  * Box2D v3.2's opaque `b2DynamicTree` and `b2Replay` types are used through the C API.
 
   * [With RAII](#ownership) - automatically destroy box2d objects in destructors
 
@@ -56,10 +58,10 @@ Must use C++20 or newer.
 
 Install [box2d 3.x](https://github.com/erincatto/box2d) as usual, our header includes their.
 
-Clone and add `include/` to the header search path. Include `<box2cpp.h>`. The library is header-only.
+Clone and add `include/` to the header search path. Include `<box2cpp/box2cpp.h>`. The library is header-only.
 
 **Note on branches:**<br/>
-Box2cpp's `master` branch corresponds to box2d's `main` branch (open an issue if it gets outdated).<br/>
+This branch targets Box2D `v3.2.0`, including its optional double precision mode.<br/>
 If you instead use box2d's release (e.g. `v3.0.0`), use the respective box2cpp's branch (e.g. `box2d-3.0.0`).
 
 <details><summary>Regenerating the header</summary>
@@ -68,7 +70,7 @@ If the header is outdated, you can regenerate it yourself. (See comment at the b
 
 Prerequisites: `git`, GNU `make`, `sed`, `perl`, `gawk` (GNU awk). On Windows, install that from MSYS2 and run inside MSYS2 terminal (or use WSL).
 
-Run `make`. It will clone box2d to `./box2d` (or do nothing if already exists; make sure to advance it to the latest commit manually if needed), and will regenerate `include/box2cpp.h`. The comments at the beginning of `Makefile` have instructions for running tests, if you want to.
+Run `make`. It will clone Box2D `v3.2.0` to `./box2d` (or use the existing checkout), and regenerate `include/box2cpp/box2cpp.h`. Set `BOX2D_REF` to choose a different ref for a new clone. To use a checkout elsewhere, run `make BOX2D_DIR=../box2d`. The comments at the beginning of `Makefile` have instructions for running tests. Test double precision with `make run_tests BOX2D_DIR=../box2d SYNTAX_ONLY=1 COMPILERS=clang++ FLAGS=-DBOX2D_DOUBLE_PRECISION`.
 
 </details>
 
@@ -133,8 +135,8 @@ When the callback receives a `b2ShapeId`, you can (and should) instead use `b2::
 ```cpp
 std::string str = "Foo!";
 world.Overlap(
-    b2Circle{.center{}, .radius = 1},
-    b2Transform_identity,
+    b2Pos{},
+    b2ShapeProxy{.points = {point}, .count = 1, .radius = 0},
     b2DefaultQueryFilter(),
     [&](b2::ShapeRef shape)
     {
@@ -147,11 +149,11 @@ world.Overlap(
 Compare with the original C API:
 ```cpp
 std::string str = "Foo!";
-b2Circle circle{.center{}, .radius = 1};
-b2World_OverlapCircle(
+b2ShapeProxy shape{.points = {point}, .count = 1, .radius = 0};
+b2World_OverlapShape(
     world,
-    &circle,
-    b2Transform_identity,
+    b2Pos{},
+    &shape,
     b2DefaultQueryFilter(),
     [](b2ShapeId shape, void *context)
     {
@@ -170,7 +172,7 @@ Those callback improvements are not yet implemented for `b2::World::SetPreSolveC
 
 We have an optional debug renderer using ImGui.
 
-See comments in [`<box2cpp/debug_imgui_renderer.h>`](https://github.com/HolyBlackCat/box2cpp/blob/main/include/box2cpp/debug_imgui_renderer.h) for usage details.
+See comments in [`<box2cpp/debug_imgui_renderer.h>`](./include/box2cpp/debug_imgui_renderer.h) for usage details.
 
 Simple example: (this assumes you already know how to use ImGui)
 ```cpp
@@ -182,7 +184,7 @@ int main()
 {
     // Initialize ImGui...
 
-    b2::World w(b2::World::Params{});
+    b2::World world(b2::World::Params{});
     b2::DebugImguiRenderer debug_renderer;
 
     while (true)
@@ -190,7 +192,6 @@ int main()
         // ImGui main loop...
 
         debug_renderer.DrawShapes(world); // Draw Box2D shapes.
-        debug_renderer.MouseDrag(world); // Allow dragging bodies with mouse.
         debug_renderer.DrawModeToggles(); // Checkboxes for adjusting visualization.
     }
 }

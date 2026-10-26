@@ -1,9 +1,6 @@
 BEGIN {
     own_version = "0.17"
 
-    if (!box2d_dir)
-        box2d_dir = "box2d"
-
     print "#pragma once"
     print ""
     print "// box2cpp, C++ bindings for box2d 3.x"
